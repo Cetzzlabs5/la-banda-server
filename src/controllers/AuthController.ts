@@ -40,4 +40,93 @@ export class AuthController {
         }
     }
 
+    static confirmAccount = async (req: Request, res: Response) => {
+        try {
+            const { token } = req.body
+
+            const tokenExists = await Token.findOne({ token })
+
+            if (!tokenExists) {
+                const error = new Error('Token no valido')
+                res.status(404).json({ message: error.message })
+                return
+            }
+
+            const user = await User.findById(tokenExists.user)
+
+            if (!user) {
+                const error = new Error('Usuario no encontrado')
+                res.status(404).json({ message: error.message })
+                return
+            }
+
+            user.isActive = true
+
+            await Promise.allSettled([user.save(), tokenExists.deleteOne()])
+            res.send('Cuanta confirmada correctamente')
+
+        } catch (error) {
+            res.status(500).json({ message: 'Hubo un error' })
+
+        }
+    }
+
+    static requestConfirmationCode = async (req: Request, res: Response) => {
+        try {
+            const { email } = req.body
+
+            // Usuario exist
+            const user = await User.findOne({ email })
+
+            if (!user) {
+                const error = new Error('El Usuario no esta registrado')
+                res.status(404).json({ error: error.message })
+                return
+            }
+
+            if (user.isActive) {
+                const error = new Error('El Usuario ya esta confirmado')
+                res.status(403).json({ error: error.message })
+                return
+            }
+
+            // Generar token
+            const token = new Token()
+            token.token = generateToken()
+            token.user = user._id
+
+            // Enviar email
+            AuthEmail.sendConfirmationEmail({
+                email: user.email,
+                name: user.name,
+                token: token.token
+            })
+
+            await Promise.allSettled([user.save(), token.save()])
+            res.send('Se envio un nuevo token a tu email')
+        } catch (error) {
+            res.status(500).json({ error: 'Hubo un error' })
+        }
+    }
+
+    static validateToken = async (req: Request, res: Response) => {
+        try {
+            const { token } = req.body
+
+            const tokenExists = await Token.findOne({ token })
+
+            if (!tokenExists) {
+                const error = new Error('Token no valido')
+                res.status(404).json({ message: error.message })
+                return
+            }
+
+            res.send('Token valido, define tu nueva contraseña')
+
+        } catch {
+            res.status(500).json({ message: 'Hubo un error' })
+
+        }
+    }
+
 }
