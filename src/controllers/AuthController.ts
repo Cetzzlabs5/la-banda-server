@@ -3,6 +3,8 @@ import User from "../models/User";
 import { generateToken } from "../utils/token";
 import Token from "../models/Token";
 import { AuthEmail } from "../emails/AuthEmail";
+import { checkPassword } from "../utils/auth";
+import { generateJWT } from "../utils/jwt";
 
 export class AuthController {
 
@@ -127,6 +129,61 @@ export class AuthController {
             res.status(500).json({ message: 'Hubo un error' })
 
         }
+    }
+
+    static login = async (req: Request, res: Response) => {
+        try {
+            const { email, password } = req.body
+
+            const user = await User.findOne({ email })
+
+            if (!user) {
+                const error = new Error('El Usuario no esta registrado')
+                res.status(404).json({ message: error.message })
+                return
+            }
+
+            if (!user.isActive) {
+                const error = new Error('El Usuario no esta confirmado')
+                res.status(403).json({ message: error.message })
+                return
+            }
+
+            const isPasswordCorrect = await checkPassword(password, user.password)
+
+            if (!isPasswordCorrect) {
+                const error = new Error('La contraseña es incorrecta')
+                res.status(403).json({ message: error.message })
+                return
+            }
+
+            const token = generateJWT({ id: user._id })
+
+            res.cookie('access_token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 15 * 60 * 60 * 1000,
+            }).send('Sesion iniciada correctamente');
+
+        } catch (error) {
+            res.status(500).json({ message: 'Hubo un error' })
+        }
+    }
+
+    static logout = async (req: Request, res: Response) => {
+        res.clearCookie('access_token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            path: '/'
+        });
+
+        return res.status(200).send('Sesión cerrada correctamente');
+    }
+
+    static session = async (req: Request, res: Response) => {
+        res.json(req.user)
     }
 
 }

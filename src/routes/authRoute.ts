@@ -2,6 +2,7 @@ import { Router } from "express";
 import { AuthController } from "../controllers/AuthController";
 import { body } from "express-validator";
 import { handleInputErrors } from "../middleware/validation";
+import { authenticate } from "../middleware/auth";
 
 const router: Router = Router()
 
@@ -32,6 +33,23 @@ router.post('/validate-token',
     body('token').notEmpty().withMessage('El Token es obligatorio'),
     handleInputErrors,
     AuthController.validateToken
+)
+
+router.post('/login',
+    body('email').isEmail().withMessage('E-mail no valido'),
+    body('password').notEmpty().withMessage('La contraseña es requerida'),
+    handleInputErrors,
+    AuthController.login
+)
+
+router.get('/logout',
+    authenticate(),
+    AuthController.logout
+)
+
+router.get('/session',
+    authenticate(),
+    AuthController.session
 )
 
 export default router

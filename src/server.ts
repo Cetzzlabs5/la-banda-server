@@ -3,6 +3,7 @@ import morgan from 'morgan'
 import authRouter from './routes/authRoute'
 import { corsMiddleware } from './config/cors'
 import { connectDB } from './config/db'
+import cookieParser from 'cookie-parser'
 
 if (process.env.NODE_ENV !== 'production') {
     process.loadEnvFile()
@@ -12,6 +13,7 @@ connectDB()
 
 const app: Express = express()
 app.use(corsMiddleware())
+app.use(cookieParser());
 
 // Logging
 app.use(morgan('dev'))
