@@ -13,7 +13,7 @@ export class AuthEmail {
             from: '"La Banda" <cetzzlabs@gmail.com>', // Las comillas en el nombre ayudan a que se muestre mejor en la bandeja
             to: email,
             subject: '¡Bienvenido a La Banda! Confirma tu cuenta',
-            text: `Hola ${name}, gracias por registrarte en La Banda. Tu código de confirmación es: ${token}. Ingrésalo en: ${process.env.FRONTEND_URL}/auth/confirm-account. Este token expira en 10 minutos.`,
+            text: `Hola ${name}, gracias por registrarte en La Banda. Tu código de confirmación es: ${token}. Ingrésalo en: ${process.env.FRONTEND_URL}/confirm-account. Este token expira en 10 minutos.`,
             html: `
                 <div style="font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5; padding: 40px 20px; color: #333;">
                     <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -36,7 +36,7 @@ export class AuthEmail {
                             </div>
 
                             <div style="text-align: center; margin-bottom: 30px;">
-                                <a href="${process.env.FRONTEND_URL}/auth/confirm-account" style="background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block; transition: background-color 0.3s;">
+                                <a href="${process.env.FRONTEND_URL}/confirm-account" style="background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block; transition: background-color 0.3s;">
                                     Ir a Confirmar Cuenta
                                 </a>
                             </div>

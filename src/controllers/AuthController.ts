@@ -80,13 +80,13 @@ export class AuthController {
 
             if (!user) {
                 const error = new Error('El Usuario no esta registrado')
-                res.status(404).json({ error: error.message })
+                res.status(404).json({ message: error.message })
                 return
             }
 
             if (user.isActive) {
                 const error = new Error('El Usuario ya esta confirmado')
-                res.status(403).json({ error: error.message })
+                res.status(403).json({ message: error.message })
                 return
             }
 
@@ -105,7 +105,7 @@ export class AuthController {
             await Promise.allSettled([user.save(), token.save()])
             res.send('Se envio un nuevo token a tu email')
         } catch (error) {
-            res.status(500).json({ error: 'Hubo un error' })
+            res.status(500).json({ message: 'Hubo un error' })
         }
     }
 
