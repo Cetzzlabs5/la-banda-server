@@ -3,7 +3,7 @@ import User from "../models/User";
 import { generateToken } from "../utils/token";
 import Token from "../models/Token";
 import { AuthEmail } from "../emails/AuthEmail";
-import { checkPassword } from "../utils/auth";
+import { checkPassword, hashPassword } from "../utils/auth";
 import { generateJWT } from "../utils/jwt";
 
 export class AuthController {
@@ -111,6 +111,33 @@ export class AuthController {
         }
     }
 
+    static forgotPassword = async (req: Request, res: Response) => {
+        try {
+            const { email } = req.body
+
+            const user = await User.findOne({ email })
+            if (!user) {
+                const error = new Error('El usuario no esta registrado')
+                res.status(404).json({ error: error.message })
+                return
+            }
+
+            const token = new Token()
+            token.token = generateToken()
+            token.user = user._id
+            await token.save()
+
+            AuthEmail.sendPasswordResetToken({
+                email: user.email,
+                name: user.name,
+                token: token.token
+            })
+            res.send('Revisa tu email para instrucciones')
+        } catch (error) {
+            res.status(500).json({ error: 'Hubo un error al crear la cuenta' })
+        }
+    }
+
     static validateToken = async (req: Request, res: Response) => {
         try {
             const { token } = req.body
@@ -128,6 +155,35 @@ export class AuthController {
         } catch {
             res.status(500).json({ message: 'Hubo un error' })
 
+        }
+    }
+
+    static updatePasswordWithToken = async (req: Request, res: Response) => {
+        try {
+            const { token } = req.params
+
+            const tokenExist = await Token.findOne({ token })
+            if (!tokenExist) {
+                const error = new Error('Token no valido')
+                res.status(404).json({ error: error.message })
+                return
+            }
+
+            const user = await User.findById(tokenExist.user)
+
+            if (!user) {
+                const error = new Error('Usuario no encontrado')
+                res.status(404).json({ message: error.message })
+                return
+            }
+
+            user.password = req.body.password
+
+            await Promise.allSettled([user.save(), tokenExist.deleteOne()])
+
+            res.send('La contrseña se reestableció correctamente')
+        } catch (error) {
+            res.status(500).json({ error: 'Hubo un error al crear la cuenta' })
         }
     }
 
