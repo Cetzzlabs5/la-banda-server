@@ -2,8 +2,10 @@ import { Document, model, Schema } from "mongoose";
 import { hashPassword } from "../utils/auth";
 
 export enum Role {
-    ADMIN = 'admin',
-    USER = 'user'
+    ADMIN = 'ADMIN',
+    USER = 'USER',
+    OWNER = 'OWNER',
+    WAITER = 'WAITER'
 }
 
 export interface IUser extends Document {
@@ -12,18 +14,21 @@ export interface IUser extends Document {
     email: string;
     password: string;
     birthdate?: Date;
-    isActive: boolean;
     role: Role;
+    avatarUrl?: string; // or string if required
+    isActive: boolean;
 }
 
 const userSchema = new Schema<IUser>({
     name: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     lastName: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     email: {
         type: String,
@@ -39,14 +44,17 @@ const userSchema = new Schema<IUser>({
     birthdate: {
         type: Date,
     },
+    role: {
+        type: String,
+        enum: Object.values(Role),
+        default: Role.USER
+    },
+    avatarUrl: {
+        type: String,
+    },
     isActive: {
         type: Boolean,
         default: false
-    },
-    role: {
-        type: String,
-        enum: Role,
-        default: Role.USER
     }
 }, {
     timestamps: true

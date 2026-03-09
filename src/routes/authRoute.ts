@@ -72,4 +72,28 @@ router.get('/session',
     AuthController.session
 )
 
+router.put('/profile',
+    authenticate(),
+    body('name').notEmpty().withMessage('El nombre es requerido').isLength({ min: 3 }).withMessage('El nombre debe tener al menos 3 caracteres'),
+    body('lastName').notEmpty().withMessage('El apellido es requerido').isLength({ min: 3 }).withMessage('El apellido debe tener al menos 3 caracteres'),
+    body('birthdate').optional().isDate().withMessage('La fecha de nacimiento es invalida'),
+    body('avatarUrl').optional().isURL().withMessage('El avatar URL es invalido'),
+    handleInputErrors,
+    AuthController.updateProfile
+)
+
+router.post('/update-password',
+    authenticate(),
+    body('currentPassword').notEmpty().withMessage('El password actual es requerido'),
+    body('password').notEmpty().withMessage('La contraseña es requerida').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres'),
+    body('confirmPassword').custom((value, { req }) => {
+        if (req.body.password !== value) {
+            throw new Error('Las contraseñas no son iguales')
+        }
+        return true
+    }),
+    handleInputErrors,
+    AuthController.updateCurrentUserPassword
+)
+
 export default router

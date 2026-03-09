@@ -242,4 +242,53 @@ export class AuthController {
         res.json(req.user)
     }
 
+    static updateProfile = async (req: Request, res: Response) => {
+        const { name, lastName, birthdate, avatarUrl } = req.body
+
+        const userExists = await User.findById(req.user!._id)
+        if (!userExists) {
+            const error = new Error('Usuario no encontrado')
+            res.status(404).json({ message: error.message })
+            return
+        }
+
+        userExists.name = name
+        userExists.lastName = lastName
+        if (birthdate) userExists.birthdate = birthdate
+        if (avatarUrl !== undefined) userExists.avatarUrl = avatarUrl
+
+        try {
+            await userExists.save()
+            res.send('Perfil actualizado correctamente')
+        } catch (error) {
+            res.status(500).json({ message: 'Hubo un error al actualizar el perfil' })
+        }
+    }
+
+    static updateCurrentUserPassword = async (req: Request, res: Response) => {
+        const { currentPassword, password } = req.body
+
+        const user = await User.findById(req.user!._id)
+        if (!user) {
+            const error = new Error('Usuario no encontrado')
+            res.status(404).json({ message: error.message })
+            return
+        }
+
+        const isPasswordCorrect = await checkPassword(currentPassword, user.password)
+        if (!isPasswordCorrect) {
+            const error = new Error('El Password actual es incorrecto')
+            res.status(401).json({ message: error.message })
+            return
+        }
+
+        try {
+            user.password = password
+            await user.save()
+            res.send('El Password se modificó correctamente')
+        } catch (error) {
+            res.status(500).json({ message: 'Hubo un error al modificar el password' })
+        }
+    }
+
 }
