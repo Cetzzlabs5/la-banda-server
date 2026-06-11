@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { handleInputErrors } from '../validation'
-import { buildMockRequest, buildMockResponse, buildMockNext } from '../../../__tests__/helpers/mockHelpers'
+import { buildMockRequest, buildMockResponse, buildMockNext } from '../../__tests__/helpers/mockHelpers'
+import { validationResult } from 'express-validator'
 
 vi.mock('express-validator', () => ({
   validationResult: vi.fn(),
@@ -8,12 +9,12 @@ vi.mock('express-validator', () => ({
 
 describe('handleInputErrors', () => {
   beforeEach(() => {
-    vi.mocked(require('express-validator').validationResult).mockReset()
+    vi.mocked(validationResult).mockReset()
   })
 
   describe('when no errors', () => {
     it('calls next()', () => {
-      vi.mocked(require('express-validator').validationResult).mockReturnValue({
+      vi.mocked(validationResult).mockReturnValue({
         isEmpty: () => true,
         array: () => [],
       } as any)
@@ -26,7 +27,7 @@ describe('handleInputErrors', () => {
     })
 
     it('does not send response', () => {
-      vi.mocked(require('express-validator').validationResult).mockReturnValue({
+      vi.mocked(validationResult).mockReturnValue({
         isEmpty: () => true,
         array: () => [],
       } as any)
@@ -42,7 +43,7 @@ describe('handleInputErrors', () => {
   describe('when errors exist', () => {
     it('returns 400 with errors array', () => {
       const mockErrors = [{ msg: 'Invalid email', path: 'email' }]
-      vi.mocked(require('express-validator').validationResult).mockReturnValue({
+      vi.mocked(validationResult).mockReturnValue({
         isEmpty: () => false,
         array: () => mockErrors,
       } as any)
@@ -56,7 +57,7 @@ describe('handleInputErrors', () => {
     })
 
     it('does not call next()', () => {
-      vi.mocked(require('express-validator').validationResult).mockReturnValue({
+      vi.mocked(validationResult).mockReturnValue({
         isEmpty: () => false,
         array: () => [{ msg: 'Error' }],
       } as any)
@@ -71,7 +72,7 @@ describe('handleInputErrors', () => {
 
   describe('when errors array is empty', () => {
     it('calls next()', () => {
-      vi.mocked(require('express-validator').validationResult).mockReturnValue({
+      vi.mocked(validationResult).mockReturnValue({
         isEmpty: () => true,
         array: () => [],
       } as any)
