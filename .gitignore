@@ -28,6 +28,9 @@ build/
 *.njsproj
 *.sln
 
+# Test coverage
+coverage/
+
 # Miscellaneous
 .DS_Store
 Thumbs.db
