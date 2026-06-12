@@ -1,10 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { UserController } from '../../controllers/UserController'
 import User from '../../models/User'
-import { getSupabaseClient } from '../../utils/supabase'
 import { buildMockRequest, buildMockResponse } from '../../__tests__/helpers/mockHelpers'
 import { Types } from 'mongoose'
-import { Readable } from 'stream'
+import fs from 'fs/promises'
 
 // Mock User model
 vi.mock('../../models/User', () => ({
@@ -13,15 +12,21 @@ vi.mock('../../models/User', () => ({
   },
 }))
 
-// Mock Supabase client
-vi.mock('../../utils/supabase', () => ({
-  getSupabaseClient: vi.fn(),
+// Mock fs
+vi.mock('fs/promises', () => ({
+  default: {
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+  },
 }))
 
 describe('UserController.uploadAvatar', () => {
   beforeEach(() => {
     vi.mocked(User.findById).mockReset()
-    vi.mocked(getSupabaseClient).mockReset()
+    vi.mocked(fs.writeFile).mockReset()
+    vi.mocked(fs.mkdir).mockReset()
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined)
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined)
   })
 
   describe('when valid image file is uploaded', () => {
@@ -33,22 +38,6 @@ describe('UserController.uploadAvatar', () => {
         save: vi.fn().mockResolvedValue(true),
       }
       vi.mocked(User.findById).mockResolvedValue(mockUser as any)
-
-      const mockUpload = vi.fn().mockResolvedValue({
-        data: { path: 'avatars/users/123/1234567890.jpg' },
-        error: null,
-      })
-      const mockGetPublicUrl = vi.fn().mockReturnValue({
-        data: { publicUrl: 'https://example.com/avatars/users/123/1234567890.jpg' },
-      })
-      vi.mocked(getSupabaseClient).mockReturnValue({
-        storage: {
-          from: vi.fn().mockReturnValue({
-            upload: mockUpload,
-            getPublicUrl: mockGetPublicUrl,
-          }),
-        },
-      } as any)
 
       const fileBuffer = Buffer.from('fake-image-data')
       const req = buildMockRequest({
@@ -65,11 +54,17 @@ describe('UserController.uploadAvatar', () => {
       await UserController.uploadAvatar(req, res)
 
       expect(res.status).toHaveBeenCalledWith(201)
-      expect(res.json).toHaveBeenCalledWith({
-        avatarUrl: 'https://example.com/avatars/users/123/1234567890.jpg',
-      })
-      expect(mockUser.avatarUrl).toBe('https://example.com/avatars/users/123/1234567890.jpg')
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          avatarUrl: expect.stringMatching(/^\/uploads\/avatars\/.*\.jpg$/),
+        })
+      )
+      expect(mockUser.avatarUrl).toMatch(/^\/uploads\/avatars\/.*\.jpg$/)
       expect(mockUser.save).toHaveBeenCalled()
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        expect.stringMatching(/uploads\\avatars\\.*\.jpg$/),
+        fileBuffer
+      )
     })
   })
 
@@ -158,7 +153,7 @@ describe('UserController.uploadAvatar', () => {
     })
   })
 
-  describe('when Supabase upload fails', () => {
+  describe('when file write fails', () => {
     it('returns 500 with upload error', async () => {
       const mockUser = {
         _id: new Types.ObjectId(),
@@ -166,18 +161,7 @@ describe('UserController.uploadAvatar', () => {
         save: vi.fn().mockResolvedValue(true),
       }
       vi.mocked(User.findById).mockResolvedValue(mockUser as any)
-
-      const mockUpload = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Upload failed' },
-      })
-      vi.mocked(getSupabaseClient).mockReturnValue({
-        storage: {
-          from: vi.fn().mockReturnValue({
-            upload: mockUpload,
-          }),
-        },
-      } as any)
+      vi.mocked(fs.writeFile).mockRejectedValue(new Error('Write failed'))
 
       const req = buildMockRequest({
         user: { _id: mockUser._id } as any,
@@ -194,7 +178,7 @@ describe('UserController.uploadAvatar', () => {
 
       expect(res.status).toHaveBeenCalledWith(500)
       expect(res.json).toHaveBeenCalledWith({
-        message: 'Error al subir el avatar',
+        message: 'Hubo un error al subir el avatar',
       })
     })
   })

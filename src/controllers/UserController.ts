@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import User from "../models/User";
-import { getSupabaseClient } from "../utils/supabase";
+import path from "path";
+import fs from "fs/promises";
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
@@ -70,32 +71,21 @@ export class UserController {
                 return;
             }
 
-            // Upload to Supabase Storage
-            const supabase = getSupabaseClient();
-            const timestamp = Date.now();
-            const ext = req.file.originalname.split('.').pop() || 'jpg';
-            const filePath = `avatars/users/${user._id}/${timestamp}.${ext}`;
+            // Upload to local storage
+            const ext = path.extname(req.file.originalname) || '.jpg';
+            const filename = `${user._id}-${Date.now()}${ext}`;
+            const filepath = path.join('uploads', 'avatars', filename);
 
-            const { data, error } = await supabase.storage
-                .from('avatars')
-                .upload(filePath, req.file.buffer, {
-                    contentType: req.file.mimetype,
-                });
+            // Ensure the uploads/avatars directory exists
+            await fs.mkdir(path.dirname(filepath), { recursive: true });
 
-            if (error) {
-                console.error('Supabase upload error:', error);
-                res.status(500).json({ message: "Error al subir el avatar" });
-                return;
-            }
+            await fs.writeFile(filepath, req.file.buffer);
 
-            const { data: urlData } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(filePath);
-
-            user.avatarUrl = urlData.publicUrl;
+            const avatarUrl = `/uploads/avatars/${filename}`;
+            user.avatarUrl = avatarUrl;
             await user.save();
 
-            res.status(201).json({ avatarUrl: urlData.publicUrl });
+            res.status(201).json({ avatarUrl });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Hubo un error al subir el avatar" });

@@ -31,6 +31,9 @@ build/
 # Test coverage
 coverage/
 
+# Uploads
+uploads/
+
 # Miscellaneous
 .DS_Store
 Thumbs.db
