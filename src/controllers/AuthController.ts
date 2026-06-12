@@ -239,7 +239,87 @@ export class AuthController {
     }
 
     static session = async (req: Request, res: Response) => {
-        res.json(req.user)
+        const user = await User.findById(req.user!._id).select('_id name lastName email role isActive profileComplete birthdate avatarUrl')
+        res.json(user)
+    }
+
+    static onboarding = async (req: Request, res: Response) => {
+        try {
+            const { fullName, birthdate } = req.body
+
+            // Validate fullName
+            if (!fullName || fullName.trim().length < 2 || fullName.trim().length > 50) {
+                res.status(400).json({
+                    message: 'El nombre completo es requerido y debe tener entre 2 y 50 caracteres',
+                })
+                return
+            }
+
+            // Validate birthdate
+            if (!birthdate || isNaN(Date.parse(birthdate))) {
+                res.status(400).json({
+                    message: 'La fecha de nacimiento es requerida',
+                })
+                return
+            }
+
+            const user = await User.findById(req.user!._id)
+            if (!user) {
+                res.status(404).json({ message: 'Usuario no encontrado' })
+                return
+            }
+
+            if (user.profileComplete) {
+                res.status(409).json({ message: 'El perfil ya fue completado' })
+                return
+            }
+
+            // Split fullName into name and lastName (first word = name, rest = lastName)
+            const nameParts = fullName.trim().split(/\s+/)
+            if (nameParts.length < 2) {
+                res.status(400).json({ message: 'El nombre completo debe tener al menos 2 palabras' })
+                return
+            }
+            user.name = nameParts[0]
+            user.lastName = nameParts.slice(1).join(' ')
+            user.birthdate = new Date(birthdate)
+            user.profileComplete = true
+
+            await user.save()
+
+            res.status(201).json({ message: 'Perfil completado correctamente' })
+        } catch (error) {
+            console.error(error)
+            res.status(500).json({ message: 'Hubo un error al completar el perfil' })
+        }
+    }
+
+    static getProfile = async (req: Request, res: Response) => {
+        try {
+            const user = await User.findById(req.user!._id).select('-password -__v')
+
+            if (!user) {
+                res.status(404).json({ message: 'Usuario no encontrado' })
+                return
+            }
+
+            if (!user.profileComplete) {
+                res.status(200).json({ user, profile: null })
+                return
+            }
+
+            res.status(200).json({
+                user,
+                profile: {
+                    fullName: `${user.name} ${user.lastName}`,
+                    birthdate: user.birthdate,
+                    avatarUrl: user.avatarUrl,
+                },
+            })
+        } catch (error) {
+            console.error(error)
+            res.status(500).json({ message: 'Hubo un error al obtener el perfil' })
+        }
     }
 
     static updateProfile = async (req: Request, res: Response) => {

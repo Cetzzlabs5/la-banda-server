@@ -17,6 +17,30 @@ declare global {
 }
 
 /**
+ * Middleware para verificar que el usuario tenga el perfil completado.
+ */
+export const requireCompleteProfile = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.user?._id) {
+            res.status(403).json({ message: 'Debes completar tu perfil antes de continuar' });
+            return;
+        }
+
+        const user = await User.findById(req.user._id).select('profileComplete');
+
+        if (!user || !user.profileComplete) {
+            res.status(403).json({ message: 'Debes completar tu perfil antes de continuar' });
+            return;
+        }
+
+        next();
+    } catch (error) {
+        console.error(error);
+        res.status(403).json({ message: 'Debes completar tu perfil antes de continuar' });
+    }
+};
+
+/**
  * Middleware para autenticar y verificar roles.
  * @param allowedRoles Array de roles permitidos. Por defecto es [Role.USER]
  */

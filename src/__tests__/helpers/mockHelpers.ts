@@ -11,6 +11,7 @@ export const buildMockUser = (overrides: Partial<IUser> = {}): IUser => ({
   password: '$2b$04$hashedpassword',      // Pre-hashed bcrypt string
   role: Role.USER,
   isActive: true,
+  profileComplete: false,
   birthdate: new Date('1990-01-01'),
   avatarUrl: undefined,
   createdAt: new Date(),

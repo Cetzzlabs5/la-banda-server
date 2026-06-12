@@ -72,6 +72,19 @@ router.get('/session',
     AuthController.session
 )
 
+router.post('/onboarding',
+    authenticate(),
+    body('fullName').notEmpty().withMessage('El nombre completo es requerido').isLength({ min: 2, max: 50 }).withMessage('El nombre completo es requerido y debe tener entre 2 y 50 caracteres'),
+    body('birthdate').notEmpty().withMessage('La fecha de nacimiento es requerida'),
+    handleInputErrors,
+    AuthController.onboarding
+)
+
+router.get('/onboarding/profile',
+    authenticate(),
+    AuthController.getProfile
+)
+
 router.put('/profile',
     authenticate(),
     body('name').notEmpty().withMessage('El nombre es requerido').isLength({ min: 3 }).withMessage('El nombre debe tener al menos 3 caracteres'),

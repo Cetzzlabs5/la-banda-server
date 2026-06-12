@@ -17,6 +17,7 @@ export interface IUser extends Document {
     role: Role;
     avatarUrl?: string; // or string if required
     isActive: boolean;
+    profileComplete: boolean;
 }
 
 const userSchema = new Schema<IUser>({
@@ -53,6 +54,10 @@ const userSchema = new Schema<IUser>({
         type: String,
     },
     isActive: {
+        type: Boolean,
+        default: false
+    },
+    profileComplete: {
         type: Boolean,
         default: false
     }
