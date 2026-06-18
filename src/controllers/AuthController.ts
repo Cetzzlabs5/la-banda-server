@@ -294,6 +294,7 @@ export class AuthController {
         }
     }
 
+    /** @deprecated Use UserController.getUserProfile via GET /api/users/profile instead */
     static getProfile = async (req: Request, res: Response) => {
         try {
             const user = await User.findById(req.user!._id).select('-password -__v')
@@ -322,6 +323,7 @@ export class AuthController {
         }
     }
 
+    /** @deprecated Use UserController.updateUserProfile via PUT /api/users/profile instead */
     static updateProfile = async (req: Request, res: Response) => {
         const { name, lastName, birthdate, avatarUrl } = req.body
 

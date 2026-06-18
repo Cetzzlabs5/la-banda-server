@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import User from "../models/User";
 import path from "path";
 import fs from "fs/promises";
-
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
@@ -12,7 +11,15 @@ export class UserController {
             // El usuario ya fue inyectado por el middleware 'authenticate'
             const user = await User.findById(req.user!._id).select("-password -__v");
 
-            res.json(user);
+            if (!user) {
+                res.status(404).json({ message: "Usuario no encontrado" });
+                return;
+            }
+
+            const userObj = user.toObject();
+            const fullName = `${user.name} ${user.lastName}`;
+
+            res.json({ ...userObj, fullName });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Hubo un error al obtener el perfil" });
@@ -30,11 +37,21 @@ export class UserController {
                 return;
             }
 
-            user.name = name;
-            user.lastName = lastName;
+            if (name !== undefined) {
+                user.name = name;
+            }
 
-            if (birthdate) {
+            if (lastName !== undefined) {
+                user.lastName = lastName;
+            }
+
+            if (birthdate !== undefined) {
                 user.birthdate = new Date(birthdate);
+            }
+
+            // Mark profile as complete when all required fields are present
+            if (user.name && user.lastName && user.birthdate) {
+                user.profileComplete = true;
             }
 
             await user.save();
@@ -89,6 +106,29 @@ export class UserController {
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Hubo un error al subir el avatar" });
+        }
+    }
+
+    static getUserGroups = async (req: Request, res: Response) => {
+        try {
+            const user = await User.findById(req.user!._id)
+                .populate('memberships.group', 'name avatarUrl');
+
+            if (!user) {
+                res.status(404).json({ message: "Usuario no encontrado" });
+                return;
+            }
+
+            const groups = user.memberships.map((membership: any) => ({
+                name: membership.group?.name,
+                avatarUrl: membership.group?.avatarUrl,
+                role: membership.role,
+            }));
+
+            res.json(groups);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: "Hubo un error al obtener los grupos" });
         }
     }
 }

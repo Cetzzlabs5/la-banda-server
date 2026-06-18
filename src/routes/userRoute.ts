@@ -10,26 +10,28 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Proteger todas las rutas de usuarios
 router.use(authenticate());
-router.use(requireCompleteProfile);
 
-// Obtener perfil
+// Obtener perfil (no requiere perfil completo)
 router.get("/profile", UserController.getUserProfile);
 
-// Actualizar perfil
+// Actualizar perfil (no requiere perfil completo — el usuario necesita poder llenarlo)
 router.put(
     "/profile",
-    body("name").notEmpty().withMessage("El nombre es obligatorio").isString(),
-    body("lastName").notEmpty().withMessage("El apellido es obligatorio").isString(),
+    body("name").optional().isString().withMessage("El nombre debe ser un texto"),
+    body("lastName").optional().isString().withMessage("El apellido debe ser un texto"),
     body("birthdate").optional().isISO8601().withMessage("Fecha de nacimiento no válida"),
     handleInputErrors,
     UserController.updateUserProfile
 );
 
-// Subir avatar
+// Subir avatar (no requiere perfil completo — es parte del onboarding)
 router.post(
     "/avatar",
     upload.single("avatar"),
     UserController.uploadAvatar
 );
+
+// Obtener grupos del usuario
+router.get("/groups", UserController.getUserGroups);
 
 export default router;

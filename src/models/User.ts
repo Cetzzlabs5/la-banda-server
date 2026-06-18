@@ -1,4 +1,4 @@
-import { Document, model, Schema } from "mongoose";
+import { Document, model, Schema, Types } from "mongoose";
 import { hashPassword } from "../utils/auth";
 
 export enum Role {
@@ -6,6 +6,17 @@ export enum Role {
     USER = 'USER',
     OWNER = 'OWNER',
     WAITER = 'WAITER'
+}
+
+export enum MembershipRole {
+    ADMIN = 'ADMIN',
+    MEMBER = 'MEMBER',
+    LEADER = 'LEADER'
+}
+
+export interface IMembership {
+    group: Types.ObjectId;
+    role: MembershipRole;
 }
 
 export interface IUser extends Document {
@@ -18,6 +29,7 @@ export interface IUser extends Document {
     avatarUrl?: string; // or string if required
     isActive: boolean;
     profileComplete: boolean;
+    memberships: IMembership[];
 }
 
 const userSchema = new Schema<IUser>({
@@ -60,6 +72,20 @@ const userSchema = new Schema<IUser>({
     profileComplete: {
         type: Boolean,
         default: false
+    },
+    memberships: {
+        type: [{
+            group: {
+                type: Schema.Types.ObjectId,
+                ref: 'Group'
+            },
+            role: {
+                type: String,
+                enum: Object.values(MembershipRole),
+                default: MembershipRole.MEMBER
+            }
+        }],
+        default: []
     }
 }, {
     timestamps: true

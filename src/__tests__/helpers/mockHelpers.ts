@@ -14,6 +14,7 @@ export const buildMockUser = (overrides: Partial<IUser> = {}): IUser => ({
   profileComplete: false,
   birthdate: new Date('1990-01-01'),
   avatarUrl: undefined,
+  memberships: [],
   createdAt: new Date(),
   updatedAt: new Date(),
   // Mongoose Document methods (stubs)
