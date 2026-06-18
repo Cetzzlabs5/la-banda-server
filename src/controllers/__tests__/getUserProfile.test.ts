@@ -202,7 +202,7 @@ describe('UserController.getUserGroups', () => {
         _id: new Types.ObjectId(),
         memberships: [
           {
-            group: { _id: groupId, name: 'Banda Norte', avatarUrl: 'https://example.com/group.jpg' },
+            group: { _id: groupId, name: 'Banda Norte', slug: 'banda-norte', avatarUrl: 'https://example.com/group.jpg' },
             role: 'ADMIN',
           },
         ],
@@ -221,6 +221,7 @@ describe('UserController.getUserGroups', () => {
       expect(res.json).toHaveBeenCalledWith([
         expect.objectContaining({
           name: 'Banda Norte',
+          slug: 'banda-norte',
           avatarUrl: 'https://example.com/group.jpg',
           role: 'ADMIN',
         }),

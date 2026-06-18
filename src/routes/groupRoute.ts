@@ -2,7 +2,7 @@ import { Router } from "express";
 import { GroupController } from "../controllers/GroupController";
 import { authenticate, requireCompleteProfile } from "../middleware/auth";
 import { handleInputErrors } from "../middleware/validation";
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 import { upload } from "../middleware/upload";
 
 const router: Router = Router();
@@ -23,6 +23,16 @@ router.post('/',
         .withMessage('La descripción no puede superar los 120 caracteres'),
     handleInputErrors,
     GroupController.createGroup
+);
+
+router.get('/:slug',
+    authenticate(),
+    param('slug')
+        .isString()
+        .notEmpty()
+        .withMessage('El slug es requerido'),
+    handleInputErrors,
+    GroupController.getGroupBySlug
 );
 
 export default router;

@@ -11,6 +11,7 @@ export enum GroupType {
 export interface IGroupMembership {
     user: Types.ObjectId;
     role: MembershipRole;
+    joinedAt: Date;
 }
 
 export interface IGroup extends Document {
@@ -69,6 +70,10 @@ const groupSchema = new Schema<IGroup>({
                 type: String,
                 enum: Object.values(MembershipRole),
                 default: MembershipRole.MEMBER
+            },
+            joinedAt: {
+                type: Date,
+                default: Date.now
             }
         }],
         default: []

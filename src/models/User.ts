@@ -11,12 +11,14 @@ export enum Role {
 export enum MembershipRole {
     ADMIN = 'ADMIN',
     MEMBER = 'MEMBER',
-    LEADER = 'LEADER'
+    LEADER = 'LEADER',
+    CO_LEADER = 'CO_LEADER'
 }
 
 export interface IMembership {
     group: Types.ObjectId;
     role: MembershipRole;
+    joinedAt: Date;
 }
 
 export interface IUser extends Document {
@@ -83,6 +85,10 @@ const userSchema = new Schema<IUser>({
                 type: String,
                 enum: Object.values(MembershipRole),
                 default: MembershipRole.MEMBER
+            },
+            joinedAt: {
+                type: Date,
+                default: Date.now
             }
         }],
         default: []

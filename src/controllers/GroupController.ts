@@ -130,13 +130,13 @@ export class GroupController {
                 inviteCode,
                 leader: userId,
                 avatarUrl,
-                memberships: [{ user: userId, role: MembershipRole.LEADER }]
+                memberships: [{ user: userId, role: MembershipRole.LEADER, joinedAt: new Date() }]
             });
 
             await group.save();
 
             // Update user memberships
-            user.memberships.push({ group: group._id, role: MembershipRole.LEADER });
+            user.memberships.push({ group: group._id, role: MembershipRole.LEADER, joinedAt: new Date() });
 
             try {
                 await user.save();
@@ -149,6 +149,72 @@ export class GroupController {
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Hubo un error al crear el grupo" });
+        }
+    };
+
+    static getGroupBySlug = async (req: Request, res: Response) => {
+        try {
+            const userId = req.user!._id.toString();
+            const { slug } = req.params;
+
+            const group = await Group.findOne({ slug })
+                .populate<{ memberships: { user: { _id: string; name: string; lastName: string; avatarUrl?: string }; role: MembershipRole; joinedAt: Date }[] }>('memberships.user', 'name lastName avatarUrl')
+                .lean();
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const isMember = group.memberships.some((m) => m.user._id.toString() === userId);
+            if (!isMember) {
+                res.status(403).json({ message: 'No tenés acceso a este grupo' });
+                return;
+            }
+
+            const rolePriority: Record<MembershipRole, number> = {
+                [MembershipRole.LEADER]: 0,
+                [MembershipRole.CO_LEADER]: 1,
+                [MembershipRole.MEMBER]: 2,
+                [MembershipRole.ADMIN]: 3,
+            };
+
+            const sortedMembers = [...group.memberships].sort((a, b) => {
+                const prioA = rolePriority[a.role];
+                const prioB = rolePriority[b.role];
+                if (prioA !== prioB) return prioA - prioB;
+                return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+            });
+
+            const currentUserMembership = group.memberships.find((m) => m.user._id.toString() === userId);
+            const currentUserRole = currentUserMembership?.role;
+            const isLeader = currentUserRole === MembershipRole.LEADER;
+            const isLeaderOrCoLeader = isLeader || currentUserRole === MembershipRole.CO_LEADER;
+
+            const members = sortedMembers.map((m) => ({
+                id: m.user._id,
+                name: `${m.user.name} ${m.user.lastName}`,
+                avatarUrl: m.user.avatarUrl,
+                role: m.role,
+            }));
+
+            res.status(200).json({
+                id: group._id,
+                name: group.name,
+                slug: group.slug,
+                type: group.type,
+                description: group.description,
+                avatarUrl: group.avatarUrl,
+                memberCount: group.memberships.length,
+                members,
+                inviteCode: isLeaderOrCoLeader ? group.inviteCode : undefined,
+                inviteLink: isLeaderOrCoLeader ? `labanda.app/unirse/${group.inviteCode}` : undefined,
+                canManage: isLeader,
+                currentUserRole,
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al obtener el grupo' });
         }
     };
 }

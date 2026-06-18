@@ -112,7 +112,7 @@ export class UserController {
     static getUserGroups = async (req: Request, res: Response) => {
         try {
             const user = await User.findById(req.user!._id)
-                .populate('memberships.group', 'name avatarUrl');
+                .populate('memberships.group', 'name slug avatarUrl');
 
             if (!user) {
                 res.status(404).json({ message: "Usuario no encontrado" });
@@ -121,6 +121,7 @@ export class UserController {
 
             const groups = user.memberships.map((membership: any) => ({
                 name: membership.group?.name,
+                slug: membership.group?.slug,
                 avatarUrl: membership.group?.avatarUrl,
                 role: membership.role,
             }));
