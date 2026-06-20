@@ -1,11 +1,14 @@
 import { Request, Response } from "express";
-import Group from "../models/Group";
+import Group, { GroupType } from "../models/Group";
 import User, { MembershipRole } from "../models/User";
+import JoinRequest, { JoinRequestStatus } from "../models/JoinRequest";
+import GroupBan from "../models/GroupBan";
 import { saveGroupAvatar } from "../utils/storage";
 import { generateSlug } from "../utils/slug";
 import { generateInviteCode } from "../utils/code";
 import sharp from "sharp";
 import path from "path";
+import QRCode from "qrcode";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 const NAME_REGEX = /^[a-zA-Z0-9\s-]{3,40}$/;
@@ -198,6 +201,14 @@ export class GroupController {
                 role: m.role,
             }));
 
+            let pendingRequestsCount = 0;
+            if (isLeader) {
+                pendingRequestsCount = await JoinRequest.countDocuments({
+                    group: group._id,
+                    status: JoinRequestStatus.PENDING,
+                });
+            }
+
             res.status(200).json({
                 id: group._id,
                 name: group.name,
@@ -211,10 +222,376 @@ export class GroupController {
                 inviteLink: isLeaderOrCoLeader ? `labanda.app/unirse/${group.inviteCode}` : undefined,
                 canManage: isLeader,
                 currentUserRole,
+                pendingRequestsCount,
             });
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: 'Hubo un error al obtener el grupo' });
+        }
+    };
+
+    static getGroupByInviteCode = async (req: Request, res: Response) => {
+        try {
+            const { inviteCode } = req.params;
+
+            const group = await Group.findOne({ inviteCode })
+                .select('name slug type description avatarUrl inviteCode memberships leader')
+                .lean();
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const response: any = {
+                id: group._id,
+                name: group.name,
+                slug: group.slug,
+                type: group.type,
+                description: group.description,
+                avatarUrl: group.avatarUrl,
+                memberCount: group.memberships.length,
+                inviteCode: group.inviteCode,
+            };
+
+            // If user is authenticated, include their status relative to this group
+            if (req.user) {
+                const userId = req.user._id.toString();
+
+                const isMember = group.memberships.some(
+                    (m) => m.user.toString() === userId
+                );
+
+                if (isMember) {
+                    response.userStatus = 'member';
+                    response.message = 'Ya sos parte de este grupo';
+                } else {
+                    const isBanned = await GroupBan.exists({ group: group._id, user: req.user._id });
+                    if (isBanned) {
+                        response.userStatus = 'banned';
+                        response.message = 'No podés unirte a este grupo';
+                    } else {
+                        const pendingRequest = await JoinRequest.exists({
+                            group: group._id,
+                            user: req.user._id,
+                            status: JoinRequestStatus.PENDING,
+                        });
+                        if (pendingRequest) {
+                            response.userStatus = 'pending';
+                            response.message = 'Solicitud enviada, esperando aprobación';
+                        } else {
+                            response.userStatus = 'available';
+                        }
+                    }
+                }
+            }
+
+            res.status(200).json(response);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al obtener el grupo' });
+        }
+    };
+
+    static joinGroup = async (req: Request, res: Response) => {
+        try {
+            const userId = req.user!._id;
+            const { inviteCode } = req.body;
+
+            const group = await Group.findOne({ inviteCode });
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const isAlreadyMember = group.memberships.some(
+                (m) => m.user.toString() === userId.toString()
+            );
+
+            if (isAlreadyMember) {
+                res.status(409).json({ message: 'Ya sos parte de este grupo' });
+                return;
+            }
+
+            const isBanned = await GroupBan.exists({ group: group._id, user: userId });
+            if (isBanned) {
+                res.status(403).json({ message: 'No podés unirte a este grupo' });
+                return;
+            }
+
+            const existingPending = await JoinRequest.exists({
+                group: group._id,
+                user: userId,
+                status: JoinRequestStatus.PENDING,
+            });
+
+            if (existingPending) {
+                res.status(409).json({ message: 'Solicitud enviada, esperando aprobación' });
+                return;
+            }
+
+            // Closed groups require approval
+            if (group.type === GroupType.CLOSED) {
+                const joinRequest = new JoinRequest({
+                    group: group._id,
+                    user: userId,
+                    status: JoinRequestStatus.PENDING,
+                });
+                await joinRequest.save();
+
+                res.status(200).json({
+                    message: 'Solicitud enviada, esperando aprobación',
+                    status: 'pending',
+                });
+                return;
+            }
+
+            // Open groups: instant join
+            const user = await User.findById(userId);
+            if (!user) {
+                res.status(404).json({ message: 'Usuario no encontrado' });
+                return;
+            }
+
+            group.memberships.push({
+                user: userId,
+                role: MembershipRole.MEMBER,
+                joinedAt: new Date(),
+            });
+
+            user.memberships.push({
+                group: group._id,
+                role: MembershipRole.MEMBER,
+                joinedAt: new Date(),
+            });
+
+            const [groupResult, userResult] = await Promise.allSettled([
+                group.save(),
+                user.save(),
+            ]);
+
+            if (groupResult.status === 'rejected' || userResult.status === 'rejected') {
+                res.status(500).json({ message: 'Hubo un error al unirte al grupo' });
+                return;
+            }
+
+            res.status(200).json({
+                message: 'Te uniste al grupo exitosamente',
+                group: {
+                    id: group._id,
+                    name: group.name,
+                    slug: group.slug,
+                },
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al unirte al grupo' });
+        }
+    };
+
+    static getGroupQR = async (req: Request, res: Response) => {
+        try {
+            const userId = req.user!._id.toString();
+            const { slug } = req.params;
+
+            const group = await Group.findOne({ slug })
+                .select('inviteCode memberships')
+                .lean();
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const isMember = group.memberships.some(
+                (m) => m.user.toString() === userId
+            );
+
+            if (!isMember) {
+                res.status(403).json({ message: 'No tenés acceso a este grupo' });
+                return;
+            }
+
+            const qrBuffer = await QRCode.toBuffer(group.inviteCode, {
+                type: 'png',
+                width: 512,
+                margin: 2,
+            });
+
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Content-Length', qrBuffer.length);
+            res.status(200).send(qrBuffer);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al generar el QR' });
+        }
+    };
+
+    static getPendingRequests = async (req: Request, res: Response) => {
+        try {
+            const userId = req.user!._id.toString();
+            const { slug } = req.params;
+
+            const group = await Group.findOne({ slug }).select('leader memberships').lean();
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const isLeader = group.leader.toString() === userId;
+            if (!isLeader) {
+                res.status(403).json({ message: 'Solo el líder puede gestionar solicitudes' });
+                return;
+            }
+
+            const requests = await JoinRequest.find({
+                group: group._id,
+                status: JoinRequestStatus.PENDING,
+            })
+                .populate('user', 'name lastName avatarUrl')
+                .sort({ createdAt: -1 })
+                .lean();
+
+            const formatted = requests.map((r: any) => ({
+                id: r._id,
+                user: {
+                    id: r.user._id,
+                    name: `${r.user.name} ${r.user.lastName}`,
+                    avatarUrl: r.user.avatarUrl,
+                },
+                createdAt: r.createdAt,
+            }));
+
+            res.status(200).json(formatted);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al obtener las solicitudes' });
+        }
+    };
+
+    static approveRequest = async (req: Request, res: Response) => {
+        try {
+            const userId = req.user!._id.toString();
+            const { slug, requestId } = req.params;
+
+            const group = await Group.findOne({ slug }).select('leader memberships').lean();
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const isLeader = group.leader.toString() === userId;
+            if (!isLeader) {
+                res.status(403).json({ message: 'Solo el líder puede gestionar solicitudes' });
+                return;
+            }
+
+            const joinRequest = await JoinRequest.findOne({
+                _id: requestId,
+                group: group._id,
+                status: JoinRequestStatus.PENDING,
+            });
+
+            if (!joinRequest) {
+                res.status(404).json({ message: 'Solicitud no encontrada' });
+                return;
+            }
+
+            const requestUserId = joinRequest.user;
+
+            // Check if user is already a member (edge case)
+            const isAlreadyMember = group.memberships.some(
+                (m) => m.user.toString() === requestUserId.toString()
+            );
+
+            if (isAlreadyMember) {
+                joinRequest.status = JoinRequestStatus.REJECTED;
+                await joinRequest.save();
+                res.status(409).json({ message: 'El usuario ya es miembro del grupo' });
+                return;
+            }
+
+            const isBanned = await GroupBan.exists({ group: group._id, user: requestUserId });
+            if (isBanned) {
+                joinRequest.status = JoinRequestStatus.REJECTED;
+                await joinRequest.save();
+                res.status(403).json({ message: 'El usuario está bloqueado en este grupo' });
+                return;
+            }
+
+            // Add member to group
+            const user = await User.findById(requestUserId);
+            if (!user) {
+                res.status(404).json({ message: 'Usuario no encontrado' });
+                return;
+            }
+
+            await Group.findByIdAndUpdate(group._id, {
+                $push: {
+                    memberships: {
+                        user: requestUserId,
+                        role: MembershipRole.MEMBER,
+                        joinedAt: new Date(),
+                    },
+                },
+            });
+
+            user.memberships.push({
+                group: group._id,
+                role: MembershipRole.MEMBER,
+                joinedAt: new Date(),
+            });
+            await user.save();
+
+            joinRequest.status = JoinRequestStatus.APPROVED;
+            await joinRequest.save();
+
+            res.status(200).json({ message: 'Solicitud aprobada' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al aprobar la solicitud' });
+        }
+    };
+
+    static rejectRequest = async (req: Request, res: Response) => {
+        try {
+            const userId = req.user!._id.toString();
+            const { slug, requestId } = req.params;
+
+            const group = await Group.findOne({ slug }).select('leader').lean();
+
+            if (!group) {
+                res.status(404).json({ message: 'Grupo no encontrado' });
+                return;
+            }
+
+            const isLeader = group.leader.toString() === userId;
+            if (!isLeader) {
+                res.status(403).json({ message: 'Solo el líder puede gestionar solicitudes' });
+                return;
+            }
+
+            const joinRequest = await JoinRequest.findOne({
+                _id: requestId,
+                group: group._id,
+                status: JoinRequestStatus.PENDING,
+            });
+
+            if (!joinRequest) {
+                res.status(404).json({ message: 'Solicitud no encontrada' });
+                return;
+            }
+
+            joinRequest.status = JoinRequestStatus.REJECTED;
+            await joinRequest.save();
+
+            res.status(200).json({ message: 'Solicitud rechazada' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Hubo un error al rechazar la solicitud' });
         }
     };
 }

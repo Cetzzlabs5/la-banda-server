@@ -42,6 +42,7 @@ export const buildMockResponse = (): Response => {
     send: vi.fn().mockReturnThis(),
     cookie: vi.fn().mockReturnThis(),
     clearCookie: vi.fn().mockReturnThis(),
+    setHeader: vi.fn().mockReturnThis(),
   }
   return res as unknown as Response
 }

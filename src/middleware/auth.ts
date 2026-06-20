@@ -17,6 +17,35 @@ declare global {
 }
 
 /**
+ * Middleware opcional de autenticación.
+ * Si hay token válido, inyecta req.user. Si no, continúa sin error.
+ */
+export const optionalAuthenticate = async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.cookies.access_token;
+
+    if (!token) {
+        next();
+        return;
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as IDecodedToken;
+
+        if (decoded && decoded.id) {
+            const user = await User.findById(decoded.id).select('_id name lastName email role isActive');
+
+            if (user && user.isActive) {
+                req.user = user;
+            }
+        }
+    } catch {
+        // Token inválido: continuar sin usuario
+    }
+
+    next();
+};
+
+/**
  * Middleware para verificar que el usuario tenga el perfil completado.
  */
 export const requireCompleteProfile = async (req: Request, res: Response, next: NextFunction) => {

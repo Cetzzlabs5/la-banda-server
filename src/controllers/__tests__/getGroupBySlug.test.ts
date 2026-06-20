@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { GroupController } from '../../controllers/GroupController'
 import Group from '../../models/Group'
+import JoinRequest from '../../models/JoinRequest'
 import { MembershipRole } from '../../models/User'
 import { buildMockRequest, buildMockResponse } from '../../__tests__/helpers/mockHelpers'
 import { Types } from 'mongoose'
@@ -21,6 +22,23 @@ vi.mock('../../models/User', () => ({
   },
 }))
 
+vi.mock('../../models/JoinRequest', () => ({
+  default: {
+    countDocuments: vi.fn().mockResolvedValue(0),
+    findOne: vi.fn().mockResolvedValue(null),
+    find: vi.fn().mockReturnValue({
+      populate: vi.fn().mockReturnThis(),
+      sort: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([]),
+    }),
+  },
+  JoinRequestStatus: {
+    PENDING: 'PENDING',
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+  },
+}))
+
 function buildMockQuery(mockGroup: any) {
   return {
     populate: vi.fn().mockReturnThis(),
@@ -31,6 +49,7 @@ function buildMockQuery(mockGroup: any) {
 describe('GroupController.getGroupBySlug', () => {
   beforeEach(() => {
     vi.mocked(Group.findOne).mockReset()
+    vi.mocked(JoinRequest.countDocuments).mockReset().mockResolvedValue(0)
   })
 
   describe('happy path as leader', () => {
