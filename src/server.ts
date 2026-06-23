@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser'
 import path from 'path'
 
 import groupRouter from './routes/groupRoute'
+import barRouter from './routes/barRoute'
 
 if (process.env.NODE_ENV !== 'production') {
     process.loadEnvFile()
@@ -31,6 +32,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')))
 app.use('/api/auth', authRouter)
 app.use('/api/users', userRouter)
 app.use('/api/groups', groupRouter)
+app.use('/api/bar', barRouter)
 app.get('/api', (req, res) => {
     res.send('Hello World!')
 })
