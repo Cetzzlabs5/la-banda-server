@@ -364,7 +364,7 @@ describe('GroupController.getGroupQR', () => {
 
       await GroupController.getGroupQR(req, res)
 
-      expect(QRCode.toBuffer).toHaveBeenCalledWith('BAN4K2', {
+      expect(QRCode.toBuffer).toHaveBeenCalledWith('https://labanda.app/unirse/BAN4K2', {
         type: 'png',
         width: 512,
         margin: 2,

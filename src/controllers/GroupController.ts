@@ -413,7 +413,10 @@ export class GroupController {
                 return;
             }
 
-            const qrBuffer = await QRCode.toBuffer(group.inviteCode, {
+            const frontendUrl = process.env.FRONTEND_URL || 'https://labanda.app';
+            const inviteUrl = `${frontendUrl}/unirse/${group.inviteCode}`;
+
+            const qrBuffer = await QRCode.toBuffer(inviteUrl, {
                 type: 'png',
                 width: 512,
                 margin: 2,
