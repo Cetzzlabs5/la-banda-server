@@ -27,6 +27,8 @@ export interface IBar extends Document {
     schedule: IScheduleSlot[];
     description?: string;
     status: BarStatus;
+    logoUrl?: string;
+    coverUrl?: string;
 }
 
 const addressSchema = new Schema<IAddress>({
@@ -101,6 +103,14 @@ const barSchema = new Schema<IBar>({
         type: String,
         enum: Object.values(BarStatus),
         default: BarStatus.PENDING,
+    },
+    logoUrl: {
+        type: String,
+        trim: true,
+    },
+    coverUrl: {
+        type: String,
+        trim: true,
     },
 }, {
     timestamps: true,

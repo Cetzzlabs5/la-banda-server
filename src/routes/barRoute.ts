@@ -4,6 +4,7 @@ import { authenticate } from "../middleware/auth";
 import { body } from "express-validator";
 import { handleInputErrors } from "../middleware/validation";
 import { Role } from "../models/User";
+import { uploadSingle } from "../middleware/upload";
 
 const router: Router = Router();
 
@@ -46,6 +47,38 @@ router.get('/mis-bares',
 router.patch('/:id/activar',
     authenticate([Role.ADMIN]),
     BarController.activateBar
+);
+
+router.get('/:id/perfil',
+    authenticate([Role.USER, Role.ADMIN]),
+    BarController.getBarProfile
+);
+
+router.patch('/:id/perfil',
+    authenticate([Role.USER, Role.ADMIN]),
+    body('name')
+        .optional()
+        .isLength({ min: 3, max: 60 }).withMessage('El nombre debe tener entre 3 y 60 caracteres'),
+    body('description')
+        .optional()
+        .isLength({ max: 120 }).withMessage('La descripción no puede superar los 120 caracteres'),
+    body('phone')
+        .optional()
+        .notEmpty().withMessage('El teléfono no puede estar vacío'),
+    handleInputErrors,
+    BarController.updateBarProfile
+);
+
+router.post('/:id/logo',
+    authenticate([Role.USER, Role.ADMIN]),
+    uploadSingle(2 * 1024 * 1024),
+    BarController.uploadBarLogo
+);
+
+router.post('/:id/cover',
+    authenticate([Role.USER, Role.ADMIN]),
+    uploadSingle(3 * 1024 * 1024),
+    BarController.uploadBarCover
 );
 
 export default router;
